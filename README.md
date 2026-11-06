@@ -20,11 +20,11 @@ The corpus consists of sample text files stored in `data/`. The files are local 
 
 ## Eager vs. Lazy
 
-| Version | Documents |  Peak Memory  |    Time   |
-|   ---   |    ---   :|      ---     :|    ---   :|
-| Eager   |     3     | 139,695 bytes | 0.00178 s |
-| Lazy    |     3     | 148,149 bytes | 0.00213 s |
+| Version | Documents | Peak Memory | Time |
+|---|---:|---:|---:|
+| Eager | 3 | 139,695 bytes | 0.00178 s |
+| Lazy | 3 | 148,149 bytes | 0.00213 s |
 
 The lazy approach processes documents incrementally, while the eager approach stores them in memory.
 
-The small corpus does not show a significant performance difference.
+The small corpus does not show a significant performance difference, and the results are inconclusive regarding memory usage.
