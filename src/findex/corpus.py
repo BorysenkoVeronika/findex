@@ -12,7 +12,7 @@ class Document(NamedTuple):
 
 def iter_documents(root: Path) -> Iterator[Document]:
 
-    for file in root.rglob("*.txt"):
+    for file in sorted(root.rglob("*.txt")):
         try:
             text = file.read_text(encoding="utf-8")
 

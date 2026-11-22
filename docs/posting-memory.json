@@ -1,0 +1,17 @@
+{
+  "plain": {
+    "build_peak_bytes": 27168,
+    "serialized_bytes": 4353,
+    "load_s": 0.00015330000314861536
+  },
+  "slots": {
+    "build_peak_bytes": 18040,
+    "serialized_bytes": 3750,
+    "load_s": 0.00026450000586919487
+  },
+  "array": {
+    "build_peak_bytes": 16776,
+    "serialized_bytes": 4629,
+    "load_s": 7.860000187065452e-05
+  }
+}

@@ -1,13 +1,17 @@
-# Python-generated files
 __pycache__/
 *.py[oc]
+.pytest_cache/
+.hypothesis/
+.ruff_cache/
+.pyright/
+.coverage
+htmlcov/
 build/
 dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-
-#data folder
-data/
+*.egg-info/
+.venv/
+*.bin
+*.prof
+*.log
+data/*.jsonl
+!data/*.txt
