@@ -1,3 +1,8 @@
+"""Read plain-text documents and crawler JSONL as a lazy corpus."""
+
+from __future__ import annotations
+
+import json
 import logging
 from collections.abc import Iterator
 from pathlib import Path
@@ -13,21 +18,26 @@ class Document(NamedTuple):
 
 
 def iter_documents(root: Path) -> Iterator[Document]:
-
-    for file in sorted(root.rglob("*.txt")):
+    """Stream text files and individual crawled pages without loading the corpus."""
+    for path in sorted(root.rglob("*.txt")):
         try:
-            text = file.read_text(encoding="utf-8")
+            yield Document(doc_id=path.stem, path=path, text=path.read_text(encoding="utf-8"))
+        except (UnicodeError, OSError) as exc:
+            logger.warning("Failed to read file %s: %s", path, exc)
 
-            yield Document(
-                doc_id=file.stem,
-                path=file,
-                text=text,
-            )
-
-        except (UnicodeDecodeError, OSError) as error:
-            logger.warning(
-                "Failed to read file %s: %s",
-                file,
-                error,
-            )
-            continue
+    for path in sorted(root.rglob("*.jsonl")):
+        try:
+            with path.open(encoding="utf-8") as handle:
+                for line_number, line in enumerate(handle, 1):
+                    if not line.strip():
+                        continue
+                    try:
+                        record = json.loads(line)
+                        if not isinstance(record, dict) or not isinstance(record.get("text"), str):
+                            raise ValueError("Missing string text field")
+                        title = record.get("title") or record.get("url") or f"{path.stem}:{line_number}"
+                        yield Document(doc_id=str(title), path=path, text=record["text"])
+                    except (ValueError, TypeError) as exc:
+                        logger.warning("Invalid JSONL record %s:%s: %s", path, line_number, exc)
+        except (UnicodeError, OSError) as exc:
+            logger.warning("Failed to read file %s: %s", path, exc)

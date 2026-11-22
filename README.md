@@ -1,6 +1,6 @@
-# Findex — Labs 01–05
+# Findex — Labs 01–06
 
-Python search engine built progressively through Lab 05.
+Python search engine built progressively through Lab 06.
 
 ## Usage
 
@@ -83,9 +83,9 @@ Ranking sanity checks (also covered by automated tests): BM25 term-frequency gai
 
 ## Lab 04 — Typing, Testing, Packaging and CLI
 
-The package defines a `findex` console entry point with `index`, `search`, `stats`, `crawl`, and `serve` commands. The command-line interface supports the required search and index options. `pyproject.toml` configures strict pyright, Ruff, pytest, and optional development dependencies. `.github/workflows/ci.yml` includes linting, format, type checks, and coverage for pushes and pull requests.
+The package defines a `findex` console entry point with `index`, `search`, and `stats` commands (with `crawl` added in Lab 06). The command-line interface supports the required search and index options. `pyproject.toml` configures strict pyright, Ruff, pytest, and optional development dependencies. `.github/workflows/ci.yml` includes linting, format, type checks, and coverage for pushes and pull requests.
 
-The full-project 68-test result and 81% coverage measurement apply to the final Lab 08 snapshot, not this intermediate version. Run the tests and coverage for this snapshot separately; Hypothesis was unavailable during local validation. Notably, `stats.py`, CLI error paths, and retry branches have lower or no coverage. Ruff formatting and strict Pyright passed on the user’s Lab 04 environment; the GitHub Actions formatting failure was subsequently corrected. A GitHub Release has not been verified. Build a wheel for this intermediate stage with `uv build`. The CLI also works with `python -m findex`, which is useful when Windows Application Control blocks the `findex.exe` launcher.
+Earlier full-project test and coverage figures refer to a different snapshot and are not claimed for this version. Ruff formatting and strict Pyright passed on the user’s Lab 04 environment; the GitHub Actions formatting failure was subsequently corrected. A GitHub Release has not been verified. Build a wheel for this intermediate stage with `uv build`. The CLI also works with `python -m findex`, which is useful when Windows Application Control blocks the `findex.exe` launcher.
 
 ## Lab 05 — Concurrency and the GIL
 
@@ -135,3 +135,40 @@ The experiment compared **CPython 3.13 (GIL enabled)** with **CPython 3.13.18 fr
 The free-threaded build completed this particular workload **0.348 s faster (22.1% less elapsed time)**, equivalent to **1.28× speedup** over the traditional build. Both runs reported 5,000 indexed documents and 135 terms. This is a small, synthetic, three-run comparison, not a general claim of free-threaded scaling or proof of race-condition freedom. The executors' output equivalence was tested separately on the sample corpus.
 
 Reproduce these results with `benchmarks/nogil.py`, using the free-threaded and traditional Python 3.13 interpreters respectively. The benchmark imports the project directly with `PYTHONPATH=src`, avoiding optional CLI dependencies that may require compiled extensions under Python 3.13t.
+
+
+## Lab 06 — Asyncio Crawler
+
+The crawler in `src/findex/crawler/` uses `httpx.AsyncClient`, bounded retries with exponential backoff and jitter, `Retry-After` handling for HTTP 429, and `asyncio.timeout`. A cached `robots.txt` policy is checked before fetching pages. The `Queue` frontier and `TaskGroup` workers operate with global and per-host concurrency limits, a minimum per-host delay, URL canonicalization, a seen-URL set, and a domain allowlist. `crawl()` yields pages incrementally as an async generator; CPU-bound indexing is performed later, outside the event loop. `tests/test_crawler.py` provides `httpx.MockTransport` tests, which have **not** been executed for this delivery.
+
+### Crawl and index
+
+Only crawl websites where you have permission. The seed domain is used as the default allowlist; the crawler obeys `robots.txt`, respects the page limit, and requires a truthful `User-Agent` with **your own contact URL**. For example, replace the example URLs below with a domain you control and your real contact page:
+
+```bash
+uv run python -m findex crawl https://your-site.example/ --max-pages 500 --concurrency 10 --per-host 2 --user-agent "FindexCrawler/0.6 (+https://your-site.example/contact)" --out data/crawl.jsonl
+uv run python -m findex index data/ --out crawled-index.bin
+uv run python -m findex search crawled-index.bin "python"
+```
+
+The crawl command writes each page to a JSONL record (`url`, `title`, `text`, `fetched_at`) as it arrives. `iter_documents` reads both the original `.txt` files and the crawler `.jsonl` output; `findex index` indexes them together. The live display reports pages fetched, pages/s, requests in flight, errors and frontier size. The per-URL crawl log is `crawl.log` (excluded from Git). The `--user-agent` setting identifies the crawler; do not use a contact URL that does not belong to you.
+
+### M4 — Concurrency benchmark
+
+`benchmarks/crawler.py` prepares a **200-page local `httpx.MockTransport` fixture**, so it makes no external web requests. It compares the same seed and page limit using concurrency 1, 5 and 20, saves `docs/lab06-benchmark.csv`, and records an HTTP 429 retry. The per-host limit is set equal to global concurrency for this controlled experiment, with the rate delay set to zero; real crawling should keep conservative per-host limits and delays. The experiment has **not been executed** for this delivery, so no measurements or log excerpts are claimed.
+
+| Concurrency | Pages | Wall (s) | Pages/s | Errors | Peak RSS (MiB) |
+|---|---:|---:|---:|---:|---:|
+| 1 | — | — | — | — | — |
+| 5 | — | — | — | — | — |
+| 20 | — | — | — | — | — |
+
+Async overlap can improve throughput when requests spend time awaiting network I/O, whereas Lab 05's concurrent indexer mostly performs CPU-bound tokenization and merging. A per-host limit intentionally lowers peak request rate to protect the target server. Processing each fetched page with synchronous indexing in the event loop would instead block all other tasks, so the crawler writes raw JSONL and indexing runs separately. A simulated 429 response is handled by the fetch retry logic with `Retry-After`; the benchmark's actual log evidence should be recorded after running it rather than invented here.
+
+For the benchmark only (not external crawling):
+
+```bash
+uv run python benchmarks/crawler.py --pages 200
+```
+
+The simulated `example.test` host is not a real crawled website. No external-site permission or completed live crawl is claimed.

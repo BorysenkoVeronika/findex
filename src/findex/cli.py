@@ -87,5 +87,96 @@ def stats_cmd(index: Path) -> None:
     )
 
 
+async def _run_crawl(
+    seed: str,
+    *,
+    out: Path,
+    max_pages: int,
+    concurrency: int,
+    per_host: int,
+    user_agent: str,
+    min_host_delay: float,
+) -> None:
+    """Stream crawler pages to disk without buffering the corpus in memory."""
+    import aiofiles
+    from dataclasses import asdict
+    from rich.live import Live
+    from findex.crawler.crawl import CrawlStats, crawl
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    crawler_logger = logging.getLogger("findex.crawler")
+    crawler_logger.setLevel(logging.INFO)
+    from logging.handlers import QueueHandler, QueueListener
+    from queue import SimpleQueue
+
+    log_handler = logging.FileHandler("crawl.log", encoding="utf-8")
+    log_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    queue_handler = QueueHandler(SimpleQueue())
+    listener = QueueListener(queue_handler.queue, log_handler)
+    listener.start()
+    crawler_logger.addHandler(queue_handler)
+    started = time.perf_counter()
+    current = CrawlStats(pages=0, errors=0, in_flight=0, queued=0)
+
+    def update_stats(stats: CrawlStats) -> None:
+        nonlocal current
+        current = stats
+        elapsed = max(time.perf_counter() - started, 0.001)
+        live.update(
+            Text(
+                f"Pages: {stats.pages} | Pages/s: {stats.pages / elapsed:.2f} | "
+                f"In-flight: {stats.in_flight} | Errors: {stats.errors} | Queue: {stats.queued}"
+            )
+        )
+
+    from rich.text import Text
+
+    status = Text("Starting crawl...")
+    try:
+        with Live(status, console=console, refresh_per_second=4) as live:
+            async with aiofiles.open(out, "w", encoding="utf-8") as handle:
+                async for page in crawl(
+                    [seed],
+                    max_pages=max_pages,
+                    concurrency=concurrency,
+                    per_host=per_host,
+                    min_host_delay=min_host_delay,
+                    user_agent=user_agent,
+                    on_progress=update_stats,
+                ):
+                    await handle.write(json.dumps(asdict(page), ensure_ascii=False) + "\n")
+    finally:
+        crawler_logger.removeHandler(queue_handler)
+        listener.stop()
+        log_handler.close()
+    console.print(f"Saved {current.pages} pages to {out}; per-URL details in crawl.log")
+
+
+@app.command("crawl")
+def crawl_cmd(
+    seed_url: str,
+    max_pages: int = typer.Option(500, "--max-pages", min=1),
+    concurrency: int = typer.Option(10, "--concurrency", min=1),
+    per_host: int = typer.Option(2, "--per-host", min=1),
+    out: Path = typer.Option(Path("data/crawl.jsonl"), "--out"),
+    user_agent: str = typer.Option(..., "--user-agent", help="Identify your crawler with a real contact URL"),
+    min_host_delay: float = typer.Option(0.2, "--min-host-delay", min=0),
+) -> None:
+    """Crawl a permitted site and write a streaming JSONL corpus."""
+    import asyncio
+
+    asyncio.run(
+        _run_crawl(
+            seed_url,
+            out=out,
+            max_pages=max_pages,
+            concurrency=concurrency,
+            per_host=per_host,
+            user_agent=user_agent,
+            min_host_delay=min_host_delay,
+        )
+    )
+
+
 if __name__ == "__main__":
     app()

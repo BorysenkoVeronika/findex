@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from findex.corpus import Document, logger
-from findex.index import Index, Posting, build_from_documents
+from findex.index import Index, Posting, build_from_documents, build_index
 
 
 @dataclass(frozen=True)
@@ -76,6 +76,11 @@ def build_parallel(
         raise ValueError("workers must be at least 1")
     if executor not in ("serial", "threads", "processes"):
         raise ValueError(f"Unknown executor: {executor}")
+
+    # JSONL records contain multiple documents per path; use the streaming
+    # reader so every record is indexed once with stable document IDs.
+    if any(root.rglob("*.jsonl")):
+        return build_index(root, positions=positions, limit=limit)
 
     paths = sorted(root.rglob("*.txt"))
     # Like islice(iter_documents(root), limit), limit counts valid documents.
