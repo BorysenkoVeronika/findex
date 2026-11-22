@@ -1,5 +1,4 @@
 """Boolean query AST with implicit AND, explicit OR/NOT and phrases."""
-
 from __future__ import annotations
 
 import re
@@ -45,13 +44,7 @@ class Phrase(QueryNode):
             return set()
         candidates = [dict((p.doc_id, p.positions) for p in index.postings.get(t, ())) for t in self.value]
         docs = set(candidates[0]).intersection(*(set(c) for c in candidates[1:]))
-        return {
-            doc
-            for doc in docs
-            if any(
-                all(start + i in candidates[i][doc] for i in range(1, len(candidates))) for start in candidates[0][doc]
-            )
-        }
+        return {doc for doc in docs if any(all(start + i in candidates[i][doc] for i in range(1, len(candidates))) for start in candidates[0][doc])}
 
     def terms(self) -> set[str]:
         return set(self.value)
@@ -98,33 +91,33 @@ _TOKEN_RE = re.compile(r'"[^"]*"|\(|\)|\b(?:AND|OR|NOT)\b|[^\s()]+', re.IGNORECA
 def parse(query: str) -> QueryNode:
     tokens = _TOKEN_RE.findall(query)
     if not tokens:
-        raise ValueError("Query must not be empty")
+        raise ValueError('Query must not be empty')
     pos = 0
 
     def atom() -> QueryNode:
         nonlocal pos
         if pos >= len(tokens):
-            raise ValueError("Unexpected end of query")
+            raise ValueError('Unexpected end of query')
         token = tokens[pos]
         pos += 1
-        if token.upper() == "NOT":
+        if token.upper() == 'NOT':
             return Not(atom())
-        if token == "(":
+        if token == '(':
             node = disjunction()
-            if pos >= len(tokens) or tokens[pos] != ")":
-                raise ValueError("Missing closing parenthesis")
+            if pos >= len(tokens) or tokens[pos] != ')':
+                raise ValueError('Missing closing parenthesis')
             pos += 1
             return node
-        if token == ")" or token.upper() in ("AND", "OR"):
-            raise ValueError(f"Unexpected token: {token}")
+        if token == ')' or token.upper() in ('AND', 'OR'):
+            raise ValueError(f'Unexpected token: {token}')
         if token.startswith('"'):
             terms = tuple(tokenize(token[1:-1]))
             if not terms:
-                raise ValueError("Empty phrase")
+                raise ValueError('Empty phrase')
             return Phrase(terms)
         words = list(tokenize(token))
         if not words:
-            raise ValueError("Invalid term")
+            raise ValueError('Invalid term')
         node: QueryNode = Term(words[0])
         for word in words[1:]:
             node = And(node, Term(word))
@@ -133,8 +126,8 @@ def parse(query: str) -> QueryNode:
     def conjunction() -> QueryNode:
         nonlocal pos
         node = atom()
-        while pos < len(tokens) and tokens[pos] != ")" and tokens[pos].upper() != "OR":
-            if tokens[pos].upper() == "AND":
+        while pos < len(tokens) and tokens[pos] != ')' and tokens[pos].upper() != 'OR':
+            if tokens[pos].upper() == 'AND':
                 pos += 1
             node = And(node, atom())
         return node
@@ -142,12 +135,12 @@ def parse(query: str) -> QueryNode:
     def disjunction() -> QueryNode:
         nonlocal pos
         node = conjunction()
-        while pos < len(tokens) and tokens[pos].upper() == "OR":
+        while pos < len(tokens) and tokens[pos].upper() == 'OR':
             pos += 1
             node = Or(node, conjunction())
         return node
 
     result = disjunction()
     if pos != len(tokens):
-        raise ValueError(f"Unexpected token: {tokens[pos]}")
+        raise ValueError(f'Unexpected token: {tokens[pos]}')
     return result

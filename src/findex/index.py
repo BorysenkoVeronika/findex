@@ -1,8 +1,7 @@
 """Streaming inverted index and Python mapping interface."""
-
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -29,9 +28,9 @@ class DocMeta:
 
 @dataclass
 class Index(Mapping[str, list[Posting]]):
-    postings: dict[str, list[Posting]] = field(default_factory=lambda: dict[str, list[Posting]]())
-    doc_lengths: dict[int, int] = field(default_factory=lambda: dict[int, int]())
-    doc_meta: dict[int, DocMeta] = field(default_factory=lambda: dict[int, DocMeta]())
+    postings: dict[str, list[Posting]] = field(default_factory=dict)
+    doc_lengths: dict[int, int] = field(default_factory=dict)
+    doc_meta: dict[int, DocMeta] = field(default_factory=dict)
 
     def __len__(self) -> int:
         return len(self.postings)
@@ -94,23 +93,21 @@ def main() -> None:
     from findex.store import save
     from time import perf_counter
     import tracemalloc
-
     parser = argparse.ArgumentParser()
-    parser.add_argument("corpus", type=Path)
-    parser.add_argument("--out", type=Path, default=Path("index.bin"))
-    parser.add_argument("--positions", action="store_true")
+    parser.add_argument('corpus', type=Path)
+    parser.add_argument('--out', type=Path, default=Path('index.bin'))
+    parser.add_argument('--positions', action='store_true')
     args = parser.parse_args()
     tracemalloc.start()
     start = perf_counter()
     # Use the importable module so pickle records findex.index, not __main__.
     from findex.index import build_index as canonical_build_index
-
     ix = canonical_build_index(args.corpus, positions=args.positions)
     save(ix, args.out)
     _, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
-    print(f"{ix!r} built in {perf_counter() - start:.4f}s; peak {peak} bytes")
+    print(f'{ix!r} built in {perf_counter()-start:.4f}s; peak {peak} bytes')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

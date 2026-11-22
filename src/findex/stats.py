@@ -1,8 +1,7 @@
+
 import argparse
 import time
 import tracemalloc
-
-from typing import TypedDict
 from collections import Counter
 from itertools import islice
 from pathlib import Path
@@ -11,16 +10,7 @@ from findex.corpus import iter_documents
 from findex.tokenize import tokenize
 
 
-class StatsResult(TypedDict):
-    documents: int
-    tokens: int
-    vocabulary: int
-    top_terms: list[tuple[str, int]]
-    elapsed_time: float
-    peak_memory: int
-
-
-def analyze(root: Path, limit: int | None = None) -> StatsResult:
+def analyze(root: Path, limit: int | None = None) -> dict:
     start_time = time.perf_counter()
     tracemalloc.start()
 
@@ -31,7 +21,7 @@ def analyze(root: Path, limit: int | None = None) -> StatsResult:
 
     total_documents = 0
     total_tokens = 0
-    frequencies: Counter[str] = Counter()
+    frequencies = Counter()
 
     for document in documents:
         total_documents += 1
@@ -54,8 +44,8 @@ def analyze(root: Path, limit: int | None = None) -> StatsResult:
         "peak_memory": peak_memory,
     }
 
-
-def analyze_eager(root: Path, limit: int | None = None) -> StatsResult:
+    
+def analyze_eager(root: Path, limit: int | None = None) -> dict:
     start_time = time.perf_counter()
     tracemalloc.start()
 
@@ -66,9 +56,16 @@ def analyze_eager(root: Path, limit: int | None = None) -> StatsResult:
 
     documents = list(documents)
 
-    token_lists = [list(tokenize(document.text)) for document in documents]
+    token_lists = [
+        list(tokenize(document.text))
+        for document in documents
+    ]
 
-    frequencies: Counter[str] = Counter(token for tokens in token_lists for token in tokens)
+    frequencies = Counter(
+        token
+        for tokens in token_lists
+        for token in tokens
+    )
 
     total_tokens = sum(len(tokens) for tokens in token_lists)
 
@@ -87,8 +84,11 @@ def analyze_eager(root: Path, limit: int | None = None) -> StatsResult:
     }
 
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Analyze a text corpus.")
+    parser = argparse.ArgumentParser(
+        description="Analyze a text corpus."
+    )
 
     parser.add_argument("root", type=Path)
     parser.add_argument("--limit", type=int, default=None)
@@ -106,7 +106,10 @@ def main():
         print(f"{term}: {count}")
 
     print(f"\nElapsed time: {results['elapsed_time']:.4f} seconds")
-    print(f"Peak memory: {results['peak_memory'] / (1024 * 1024):.2f} MB")
+    print(
+        f"Peak memory: "
+        f"{results['peak_memory'] / (1024 * 1024):.2f} MB"
+    )
 
 
 if __name__ == "__main__":

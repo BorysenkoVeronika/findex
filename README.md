@@ -1,6 +1,6 @@
-# Findex — Labs 01–04
+# Findex — Labs 01–05
 
-Python search engine built progressively through Lab 04.
+Python search engine built progressively through Lab 05.
 
 ## Usage
 
@@ -85,5 +85,53 @@ Ranking sanity checks (also covered by automated tests): BM25 term-frequency gai
 
 The package defines a `findex` console entry point with `index`, `search`, `stats`, `crawl`, and `serve` commands. The command-line interface supports the required search and index options. `pyproject.toml` configures strict pyright, Ruff, pytest, and optional development dependencies. `.github/workflows/ci.yml` includes linting, format, type checks, and coverage for pushes and pull requests.
 
-The full-project 68-test result and 81% coverage measurement apply to the final Lab 08 snapshot, not this intermediate version. Run the tests and coverage for this snapshot separately; Hypothesis was unavailable during local validation. Notably, `stats.py`, CLI error paths, and retry branches have lower or no coverage. Ruff formatting, strict pyright, GitHub Actions, tagging, and publishing a GitHub Release have **not been independently verified** in this offline environment. Build a wheel for this intermediate stage with `uv build`. The CLI also works with `python -m findex`, which is useful when Windows Application Control blocks the `findex.exe` launcher.
+The full-project 68-test result and 81% coverage measurement apply to the final Lab 08 snapshot, not this intermediate version. Run the tests and coverage for this snapshot separately; Hypothesis was unavailable during local validation. Notably, `stats.py`, CLI error paths, and retry branches have lower or no coverage. Ruff formatting and strict Pyright passed on the user’s Lab 04 environment; the GitHub Actions formatting failure was subsequently corrected. A GitHub Release has not been verified. Build a wheel for this intermediate stage with `uv build`. The CLI also works with `python -m findex`, which is useful when Windows Application Control blocks the `findex.exe` launcher.
 
+## Lab 05 — Concurrency and the GIL
+
+The indexer supports three execution modes: `serial`, `threads` (`ThreadPoolExecutor`), and `processes` (`ProcessPoolExecutor`). Workers receive file paths, build partial indexes, and the parent merges the postings. Document IDs are normalized consistently across executors, including when an invalid UTF-8 document is skipped. The CLI exposes `--workers` and `--executor`. Tests passed locally, and postings, document lengths, and metadata matched across the three executors on the sample corpus.
+
+### Benchmark methodology
+
+The benchmark used a synthetic corpus of **5,000 UTF-8 documents**, created by repeating the three valid sample documents. The machine reported **6 logical CPUs** (`os.cpu_count()`); the CPU model was not recorded. Each configuration was warmed up once and then measured **three times**. The table reports the **median**. Workers tested: 1, 2, 4, 6 (all available logical CPUs), and 8; serial uses one worker. Speedup is the serial median wall time divided by each configuration's median wall time.
+
+CPU time and RSS are measurements of **the parent process only**, not total worker CPU usage or combined worker memory. The RSS column therefore must not be interpreted as peak RSS across the entire process tree.
+
+| Executor | Workers | Wall (s, median) | Parent CPU (s) | Parent RSS (MiB) | Merge (s) | Speedup |
+|---|---:|---:|---:|---:|---:|---:|
+| Serial | 1 | 1.479 | 1.438 | 82.25 | 0.214 | 1.00× |
+| Threads | 1 | 1.726 | 1.531 | 82.47 | 0.272 | 0.86× |
+| Threads | 2 | 1.543 | 1.875 | 82.36 | 0.350 | 0.96× |
+| Threads | 4 | 1.583 | 1.828 | 82.68 | 0.353 | 0.93× |
+| Threads | 6 | 1.597 | 2.000 | 82.50 | 0.343 | 0.93× |
+| Threads | 8 | 1.613 | 2.047 | 83.68 | 0.348 | 0.92× |
+| Processes | 1 | 3.018 | 0.828 | 115.47 | 0.192 | 0.49× |
+| Processes | 2 | 2.143 | 0.875 | 92.15 | 0.216 | 0.69× |
+| Processes | 4 | 1.641 | 0.953 | 89.52 | 0.290 | 0.90× |
+| Processes | 6 | 1.555 | 0.953 | 89.50 | 0.221 | 0.95× |
+| Processes | 8 | 1.732 | 1.016 | 90.09 | 0.311 | 0.85× |
+
+![Lab 05 speedup vs. workers, including the ideal linear reference](docs/lab05-speedup.png)
+
+Benchmark data: `docs/lab05-benchmark.csv` and `docs/lab05-benchmark.json`. Benchmark implementation: `benchmarks/concurrency.py`.
+
+### Interpretation: GIL, processes, and Amdahl's law
+
+CPython's Global Interpreter Lock (GIL) permits only one thread at a time to execute Python bytecode within a conventional interpreter. As a result, threads often do not accelerate CPU-bound tokenization and dictionary updates; thread scheduling and coordination can add overhead. Threads remain useful for **I/O-bound** workloads because blocking operations can release the GIL, allowing other threads to make progress while one waits.
+
+Processes have separate interpreters and GILs, so they can execute CPU-bound Python code on different cores. This comes at a price: creating processes, pickling task arguments and results, transferring partial indexes, and allocating separate process memory. Sending file paths rather than fully loaded documents reduces transfer overhead. Here, six processes were the fastest process configuration (1.555 s), but still did not beat serial indexing (1.479 s). Two threads were the fastest thread configuration (1.543 s); no parallel configuration achieved a speedup above 1.0×. These observations apply to the synthetic corpus and this machine, not all workloads.
+
+The merge phase is performed in the parent and is not parallelized. This sequential fraction bounds maximum speedup under **Amdahl's law**: with fraction `s` of work inherently sequential and `N` workers, ideal speedup is limited to `1 / (s + (1 - s) / N)`. The measured merge durations (approximately 0.19–0.35 s across configurations) illustrate a nonzero serial cost, although they should not be used alone to estimate the total sequential fraction.
+
+### Free-threaded Python 3.13 — M4
+
+The experiment compared **CPython 3.13 (GIL enabled)** with **CPython 3.13.18 free-threaded (GIL disabled)** on Windows. `sys._is_gil_enabled()` returned `True` for the traditional build and `False` for the free-threaded build. Both used the same `build_parallel` function with `ThreadPoolExecutor`, **6 workers**, and the same synthetic corpus of **5,000 documents** (135 unique terms). Each configuration was measured three times with `time.perf_counter()`, using the median as the summary statistic.
+
+| Python build | GIL enabled | Run 1 (s) | Run 2 (s) | Run 3 (s) | Median (s) |
+|---|---|---:|---:|---:|---:|
+| CPython 3.13, traditional | `True` | 1.405 | 1.573 | 1.611 | **1.573** |
+| CPython 3.13.18, free-threaded | `False` | 1.161 | 1.225 | 1.276 | **1.225** |
+
+The free-threaded build completed this particular workload **0.348 s faster (22.1% less elapsed time)**, equivalent to **1.28× speedup** over the traditional build. Both runs reported 5,000 indexed documents and 135 terms. This is a small, synthetic, three-run comparison, not a general claim of free-threaded scaling or proof of race-condition freedom. The executors' output equivalence was tested separately on the sample corpus.
+
+Reproduce these results with `benchmarks/nogil.py`, using the free-threaded and traditional Python 3.13 interpreters respectively. The benchmark imports the project directly with `PYTHONPATH=src`, avoiding optional CLI dependencies that may require compiled extensions under Python 3.13t.

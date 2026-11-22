@@ -32,6 +32,5 @@ def test_apostrophe():
 def test_underscore():
     assert list(tokenize("Python_3")) == ["python", "3"]
 
-
 def test_cyrillic_text():
     assert list(tokenize("Привет МИР")) == ["привет", "мир"]

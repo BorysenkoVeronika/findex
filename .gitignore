@@ -1,4 +1,5 @@
 __pycache__/
+benchmark_data/
 *.py[oc]
 .pytest_cache/
 .hypothesis/
