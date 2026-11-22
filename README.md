@@ -1,15 +1,15 @@
-# Findex — Labs 01–03
+# Findex — Labs 01–04
 
-Python search engine built progressively through Lab 03.
+Python search engine built progressively through Lab 04.
 
 ## Usage
 
 ```bash
-python -m findex.index data/ --out index.bin --positions
-python -m findex.search index.bin "python OR java"
+uv sync --group dev
+uv run python -m findex index data/ --out index.bin --positions
+uv run python -m findex search index.bin "python"
+uv run python -m findex stats index.bin
 ```
-
-Run from an installed environment or set `PYTHONPATH=src`.
 
 ## Lab 01 — Iterators and the Corpus
 
@@ -80,4 +80,10 @@ The labels were written against the actual sample documents. Each query has one 
 | web | document3 | 0.20 | 0.20 |
 
 Ranking sanity checks (also covered by automated tests): BM25 term-frequency gains diminish under repetition; length normalization favors a shorter document at equal term frequency; uncommon terms have greater inverse-document-frequency influence. For this very small corpus, ties and query-specific lengths can affect observed order.
+
+## Lab 04 — Typing, Testing, Packaging and CLI
+
+The package defines a `findex` console entry point with `index`, `search`, `stats`, `crawl`, and `serve` commands. The command-line interface supports the required search and index options. `pyproject.toml` configures strict pyright, Ruff, pytest, and optional development dependencies. `.github/workflows/ci.yml` includes linting, format, type checks, and coverage for pushes and pull requests.
+
+The full-project 68-test result and 81% coverage measurement apply to the final Lab 08 snapshot, not this intermediate version. Run the tests and coverage for this snapshot separately; Hypothesis was unavailable during local validation. Notably, `stats.py`, CLI error paths, and retry branches have lower or no coverage. Ruff formatting, strict pyright, GitHub Actions, tagging, and publishing a GitHub Release have **not been independently verified** in this offline environment. Build a wheel for this intermediate stage with `uv build`. The CLI also works with `python -m findex`, which is useful when Windows Application Control blocks the `findex.exe` launcher.
 

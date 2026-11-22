@@ -5,10 +5,12 @@ from typing import NamedTuple
 
 logger = logging.getLogger(__name__)
 
+
 class Document(NamedTuple):
     doc_id: str
     path: Path
     text: str
+
 
 def iter_documents(root: Path) -> Iterator[Document]:
 
