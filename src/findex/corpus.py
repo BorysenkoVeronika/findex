@@ -6,7 +6,7 @@ import json
 import logging
 from collections.abc import Iterator
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,25 @@ def iter_documents(root: Path) -> Iterator[Document]:
                     if not line.strip():
                         continue
                     try:
-                        record = json.loads(line)
-                        if not isinstance(record, dict) or not isinstance(record.get("text"), str):
+                        raw_record: object = json.loads(line)
+
+                        if not isinstance(raw_record, dict):
+                            raise ValueError("Invalid JSONL record")
+
+                        record = cast(dict[str, object], raw_record)
+
+                        text = record.get("text")
+                        if not isinstance(text, str):
                             raise ValueError("Missing string text field")
-                        title = record.get("title") or record.get("url") or f"{path.stem}:{line_number}"
-                        yield Document(doc_id=str(title), path=path, text=record["text"])
+
+                        title = record.get("title")
+                        if not isinstance(title, str) or not title:
+                            title = record.get("url")
+
+                        if not isinstance(title, str) or not title:
+                            title = f"{path.stem}:{line_number}"
+
+                        yield Document(doc_id=title, path=path, text=text)
                     except (ValueError, TypeError) as exc:
                         logger.warning("Invalid JSONL record %s:%s: %s", path, line_number, exc)
         except (UnicodeError, OSError) as exc:
