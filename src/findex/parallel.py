@@ -27,9 +27,7 @@ def build_partial(doc_paths: list[tuple[int, Path]], positions: bool = True) -> 
             logger.warning("Failed to read file %s: %s", path, error)
             continue
 
-        partial = build_from_documents(
-            [document], positions=positions, start_id=doc_id
-        )
+        partial = build_from_documents([document], positions=positions, start_id=doc_id)
         index.doc_meta.update(partial.doc_meta)
         index.doc_lengths.update(partial.doc_lengths)
 
@@ -53,19 +51,12 @@ def merge(partials: Iterable[PartialIndex]) -> Index:
     # Map provisional path IDs onto that same compact, ascending sequence.
     id_map = {old_id: new_id for new_id, old_id in enumerate(sorted(combined.doc_meta))}
     result = Index()
-    result.doc_meta = {
-        id_map[old_id]: metadata for old_id, metadata in combined.doc_meta.items()
-    }
-    result.doc_lengths = {
-        id_map[old_id]: length for old_id, length in combined.doc_lengths.items()
-    }
+    result.doc_meta = {id_map[old_id]: metadata for old_id, metadata in combined.doc_meta.items()}
+    result.doc_lengths = {id_map[old_id]: length for old_id, length in combined.doc_lengths.items()}
 
     for term, postings in combined.postings.items():
         result.postings[term] = sorted(
-            (
-                Posting(id_map[p.doc_id], p.tf, p.positions)
-                for p in postings
-            ),
+            (Posting(id_map[p.doc_id], p.tf, p.positions) for p in postings),
             key=lambda p: p.doc_id,
         )
 

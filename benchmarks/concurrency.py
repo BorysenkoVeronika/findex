@@ -58,9 +58,7 @@ def parent_peak_rss_bytes() -> int:
         psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
         memory = ProcessMemoryCounters()
         memory.cb = ctypes.sizeof(memory)
-        if not psapi.GetProcessMemoryInfo(
-            kernel32.GetCurrentProcess(), ctypes.byref(memory), memory.cb
-        ):
+        if not psapi.GetProcessMemoryInfo(kernel32.GetCurrentProcess(), ctypes.byref(memory), memory.cb):
             raise OSError(ctypes.get_last_error(), "GetProcessMemoryInfo failed")
         return int(memory.PeakWorkingSetSize)
 
@@ -125,9 +123,7 @@ def run_subprocess(script: Path, corpus: Path, executor: str, workers: int) -> d
         check=False,
     )
     if completed.returncode != 0:
-        raise RuntimeError(
-            f"Benchmark failed ({executor}/{workers}):\n{completed.stderr}\n{completed.stdout}"
-        )
+        raise RuntimeError(f"Benchmark failed ({executor}/{workers}):\n{completed.stderr}\n{completed.stdout}")
     if not completed.stdout.strip():
         raise RuntimeError(f"No measurements returned by {executor}/{workers}: {completed.stderr}")
     return json.loads(completed.stdout.strip().splitlines()[-1])
@@ -140,9 +136,7 @@ def make_plot(rows: list[dict[str, Any]], path: Path) -> None:
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError as exc:
-        raise SystemExit(
-            "Matplotlib is required for the speedup PNG. Install with: uv add --dev matplotlib"
-        ) from exc
+        raise SystemExit("Matplotlib is required for the speedup PNG. Install with: uv add --dev matplotlib") from exc
 
     fig, ax = plt.subplots(figsize=(8.5, 5))
     workers = sorted({int(row["workers"]) for row in rows})
@@ -188,11 +182,7 @@ def main() -> None:
 
     cpu_count = os.cpu_count() or 1
     worker_counts = sorted({1, 2, 4, 8, cpu_count})
-    jobs = [("serial", 1)] + [
-        (executor, workers)
-        for executor in ("threads", "processes")
-        for workers in worker_counts
-    ]
+    jobs = [("serial", 1)] + [(executor, workers) for executor in ("threads", "processes") for workers in worker_counts]
     script = Path(__file__).resolve()
     results: list[dict[str, Any]] = []
     all_samples: list[dict[str, Any]] = []
@@ -216,21 +206,26 @@ def main() -> None:
             all_samples.append(sample)
             print(f" {iteration}", end="", flush=True)
 
-        med = lambda key: statistics.median(float(s[key]) for s in runs)
+        def med(key: str) -> float:
+            return statistics.median(float(s[key]) for s in runs)
+
         wall_times = [float(s["wall_s"]) for s in runs]
-        results.append({
-            "executor": executor,
-            "workers": workers,
-            "runs": args.runs,
-            "documents": runs[0]["documents"],
-            "terms": runs[0]["terms"],
-            "wall_median_s": med("wall_s"),
-            "wall_min_s": min(wall_times),
-            "wall_max_s": max(wall_times),
-            "parent_cpu_median_s": med("parent_cpu_s"),
-            "parent_peak_rss_median_mib": round(med("parent_peak_rss_bytes") / 1048576, 3),
-            "merge_median_s": med("merge_s"),
-        })
+
+        results.append(
+            {
+                "executor": executor,
+                "workers": workers,
+                "runs": args.runs,
+                "documents": runs[0]["documents"],
+                "terms": runs[0]["terms"],
+                "wall_median_s": med("wall_s"),
+                "wall_min_s": min(wall_times),
+                "wall_max_s": max(wall_times),
+                "parent_cpu_median_s": med("parent_cpu_s"),
+                "parent_peak_rss_median_mib": round(med("parent_peak_rss_bytes") / 1048576, 3),
+                "merge_median_s": med("merge_s"),
+            }
+        )
         print(f" | median {results[-1]['wall_median_s']:.3f}s", flush=True)
 
     baseline = next(row["wall_median_s"] for row in results if row["executor"] == "serial")
@@ -244,21 +239,25 @@ def main() -> None:
         writer.writerows(results)
     json_path = args.output_dir / "lab05-benchmark.json"
     with json_path.open("w", encoding="utf-8") as stream:
-        json.dump({
-            "environment": {
-                "python": sys.version,
-                "platform": platform.platform(),
-                "cpu_model": platform.processor(),
-                "cpu_count": cpu_count,
-                "corpus": str(corpus),
-                "runs": args.runs,
-                "rss_scope": "benchmark parent process only (excludes worker processes)",
-                "cpu_scope": "benchmark parent process only (excludes worker processes)",
-                "dataset_note": "Synthetic corpus if generated from repeated Lab 01 files",
+        json.dump(
+            {
+                "environment": {
+                    "python": sys.version,
+                    "platform": platform.platform(),
+                    "cpu_model": platform.processor(),
+                    "cpu_count": cpu_count,
+                    "corpus": str(corpus),
+                    "runs": args.runs,
+                    "rss_scope": "benchmark parent process only (excludes worker processes)",
+                    "cpu_scope": "benchmark parent process only (excludes worker processes)",
+                    "dataset_note": "Synthetic corpus if generated from repeated Lab 01 files",
+                },
+                "summary": results,
+                "samples": all_samples,
             },
-            "summary": results,
-            "samples": all_samples,
-        }, stream, indent=2)
+            stream,
+            indent=2,
+        )
     png_path = args.output_dir / "lab05-speedup.png"
     make_plot(results, png_path)
 
