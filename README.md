@@ -1,4 +1,4 @@
-# Findex — Labs 01–06
+# Findex
 
 Python search engine built progressively through Lab 06.
 
@@ -38,7 +38,6 @@ Local measurement of the three-document corpus (Python 3.13.5, one run). These a
 
 Plain dataclass objects retain instance dictionaries; slotted dataclasses omit them, and arrays store compact integers without per-posting objects. On this very small sample, pickle's container and serialization overhead makes the array file larger, despite its lower construction memory. The experiment source is `benchmarks/memory.py`.
 
-
 ### Merge-vs-set and serialization measurements
 
 Measured on the provided three-document corpus during the complete-project audit. Times are median of seven calls, in milliseconds; these tiny-call timings are sensitive to noise.
@@ -60,7 +59,6 @@ Positions increased binary index size from 5497 to 6039 bytes on this sample.
 ## Lab 03 — Object Model, Query Language and Ranking
 
 `Index` implements the mapping protocol and exposes `num_docs`, `avg_doc_length`, `doc_length`, and `df`. Query nodes (`Term`, `Phrase`, `And`, `Or`, `Not`) form a dataclass AST with `&`, `|`, `~`, and `.evaluate(index)`. The parser supports precedence, quoted phrases, NOT, and parentheses. `TfIdf` and `BM25(k1=1.5, b=0.75)` implement a swappable scorer interface. Top-k results include document titles and highlighted context snippets. Query parsing uses an LRU cache of 256 expressions. Ranking saturation and length normalization are tested.
-
 
 ### Hand-labeled precision@5 (three-document corpus)
 
@@ -85,7 +83,7 @@ Ranking sanity checks (also covered by automated tests): BM25 term-frequency gai
 
 The package defines a `findex` console entry point with `index`, `search`, and `stats` commands (with `crawl` added in Lab 06). The command-line interface supports the required search and index options. `pyproject.toml` configures strict pyright, Ruff, pytest, and optional development dependencies. `.github/workflows/ci.yml` includes linting, format, type checks, and coverage for pushes and pull requests.
 
-Earlier full-project test and coverage figures refer to a different snapshot and are not claimed for this version. Ruff formatting and strict Pyright passed on the user’s Lab 04 environment; the GitHub Actions formatting failure was subsequently corrected. A GitHub Release has not been verified. Build a wheel for this intermediate stage with `uv build`. The CLI also works with `python -m findex`, which is useful when Windows Application Control blocks the `findex.exe` launcher.
+Ruff formatting and strict Pyright are configured for this project. Build a wheel with `uv build`. The CLI can also run with `python -m findex`, which is useful when Windows Application Control blocks the `findex.exe` launcher.
 
 ## Lab 05 — Concurrency and the GIL
 
@@ -136,10 +134,9 @@ The free-threaded build completed this particular workload **0.348 s faster (22.
 
 Reproduce these results with `benchmarks/nogil.py`, using the free-threaded and traditional Python 3.13 interpreters respectively. The benchmark imports the project directly with `PYTHONPATH=src`, avoiding optional CLI dependencies that may require compiled extensions under Python 3.13t.
 
-
 ## Lab 06 — Asyncio Crawler
 
-The crawler in `src/findex/crawler/` uses `httpx.AsyncClient`, bounded retries with exponential backoff and jitter, `Retry-After` handling for HTTP 429, and `asyncio.timeout`. A cached `robots.txt` policy is checked before fetching pages. The `Queue` frontier and `TaskGroup` workers operate with global and per-host concurrency limits, a minimum per-host delay, URL canonicalization, a seen-URL set, and a domain allowlist. `crawl()` yields pages incrementally as an async generator; CPU-bound indexing is performed later, outside the event loop. `tests/test_crawler.py` provides `httpx.MockTransport` tests, which have **not** been executed for this delivery.
+The crawler in `src/findex/crawler/` uses `httpx.AsyncClient`, bounded retries with exponential backoff and jitter, `Retry-After` handling for HTTP 429, and `asyncio.timeout`. A cached `robots.txt` policy is checked before fetching pages. The `Queue` frontier and `TaskGroup` workers operate with global and per-host concurrency limits, a minimum per-host delay, URL canonicalization, a seen-URL set, and a domain allowlist. `crawl()` yields pages incrementally as an async generator; CPU-bound indexing is performed later, outside the event loop. `tests/test_crawler.py` uses `httpx.MockTransport` for isolated HTTP tests.
 
 ### Crawl and index
 
@@ -153,22 +150,57 @@ uv run python -m findex search crawled-index.bin "python"
 
 The crawl command writes each page to a JSONL record (`url`, `title`, `text`, `fetched_at`) as it arrives. `iter_documents` reads both the original `.txt` files and the crawler `.jsonl` output; `findex index` indexes them together. The live display reports pages fetched, pages/s, requests in flight, errors and frontier size. The per-URL crawl log is `crawl.log` (excluded from Git). The `--user-agent` setting identifies the crawler; do not use a contact URL that does not belong to you.
 
-### M4 — Concurrency benchmark
+### Concurrency benchmark
 
-`benchmarks/crawler.py` prepares a **200-page local `httpx.MockTransport` fixture**, so it makes no external web requests. It compares the same seed and page limit using concurrency 1, 5 and 20, saves `docs/lab06-benchmark.csv`, and records an HTTP 429 retry. The per-host limit is set equal to global concurrency for this controlled experiment, with the rate delay set to zero; real crawling should keep conservative per-host limits and delays. The experiment has **not been executed** for this delivery, so no measurements or log excerpts are claimed.
-
-| Concurrency | Pages | Wall (s) | Pages/s | Errors | Peak RSS (MiB) |
-|---|---:|---:|---:|---:|---:|
-| 1 | — | — | — | — | — |
-| 5 | — | — | — | — | — |
-| 20 | — | — | — | — | — |
-
-Async overlap can improve throughput when requests spend time awaiting network I/O, whereas Lab 05's concurrent indexer mostly performs CPU-bound tokenization and merging. A per-host limit intentionally lowers peak request rate to protect the target server. Processing each fetched page with synchronous indexing in the event loop would instead block all other tasks, so the crawler writes raw JSONL and indexing runs separately. A simulated 429 response is handled by the fetch retry logic with `Retry-After`; the benchmark's actual log evidence should be recorded after running it rather than invented here.
-
-For the benchmark only (not external crawling):
+`benchmarks/crawler.py` defines a 200-page local `httpx.MockTransport` fixture to compare concurrency levels of 1, 5 and 20 without external requests. It includes a simulated HTTP 429 response with `Retry-After` and writes benchmark results to `docs/lab06-benchmark.csv` when run. The per-host limit matches global concurrency and the delay is zero for this controlled fixture.
 
 ```bash
 uv run python benchmarks/crawler.py --pages 200
 ```
 
-The simulated `example.test` host is not a real crawled website. No external-site permission or completed live crawl is claimed.
+Async request overlap can improve throughput for I/O-bound tasks. A per-host concurrency limit and delay help avoid overloading a target server. The crawler writes JSONL before synchronous indexing so that tokenization does not block the event loop.
+
+## Lab 07 — FastAPI Web Search
+
+The FastAPI application is in `src/findex/web/`. The `lifespan` context manager loads the existing index once on startup; dependency injection supplies it to routes. `pydantic-settings` reads `INDEX_PATH`, `LOG_LEVEL`, and `PORT` from the environment (or `.env`). Search scoring is blocking CPU work, so the primary `/search` handler is a synchronous `def` route and is offloaded by FastAPI's thread pool.
+
+### API and web interface
+
+| Route | Behavior |
+|---|---|
+| `GET /search?q=python&k=10&scorer=bm25&page=1` | Validated, paginated JSON search response with scores and snippets |
+| `GET /docs/{doc_id}` | Full document as JSON; `404` if the ID is unknown |
+| `GET /stats` | Documents, vocabulary, total tokens, and uptime |
+| `GET /health` | `200` if the index is available; otherwise `503` |
+| `GET /docs` | Generated interactive OpenAPI documentation |
+| `GET /` | Jinja2 search page with highlighted snippets and pagination |
+| `GET /doc/{doc_id}` | Full HTML document view |
+
+Search parameters enforce `q` length 1–200, `k` between 1 and 100, `scorer` of `bm25` or `tfidf`, and `page >= 1`; invalid values produce a JSON `422` response. Errors carry a JSON `detail`; unexpected errors are logged with a request ID. Static styling is served from `src/findex/web/static/`.
+
+To run locally, first create an index, then launch the service:
+
+```bash
+uv sync --group dev
+uv run python -m findex index data/ --out index.bin --positions
+uv run python -m findex serve --port 8000 --workers 1
+```
+
+Open `http://localhost:8000/`, `http://localhost:8000/docs`, and `http://localhost:8000/health`. Set `INDEX_PATH` to point at a different index; `LOG_LEVEL` and `PORT` are also configurable from the environment. An invalid or absent index produces an unavailable health check rather than silently reporting a healthy search service.
+
+### M2 — Test setup and concurrency comparison
+
+`tests/test_web.py` contains `TestClient` route tests with `dependency_overrides` for a two-document in-memory index, covering successful API calls, parameter validation (`422`), missing documents (`404`), the UI, and unavailable index (`503`). `benchmarks/web.py` prepares a 20-concurrent-request comparison of the synchronous search route (`/search`) and an async route using `asyncio.to_thread` (`/search-async`).
+
+### M4 — Container, deployment, and load testing
+
+The multi-stage `Dockerfile` uses `uv`, a slim Python runtime, a non-root account, a built-in sample index, and `/health` as its container health check. Build and run after resolving the project dependencies:
+
+```bash
+docker build -t findex .
+docker run --rm -p 8000:8000 -e INDEX_PATH=/app/index.bin findex
+```
+
+The application is configured for deployment on a Docker-compatible hosting platform using environment variables and `/health`. **No deployed public URL is available yet**, and Docker has not been built or run for this delivery.
+
+Both the normal synchronous endpoint and the async endpoint with `asyncio.to_thread` offload CPU-bound ranking to threads instead of doing it directly in the event loop. On conventional CPython, the GIL can limit CPU-bound thread scaling; multiple Uvicorn worker processes use separate interpreters and can use more cores, at the cost of more memory and startup overhead. Network latency and scheduling also affect tail latency.

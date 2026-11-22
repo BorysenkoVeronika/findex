@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ doc.title }} | Findex</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+  <main class="container">
+    <p><a href="/">Back to search</a></p>
+    <h1>{{ doc.title }}</h1>
+    <p class="muted">Document #{{ doc_id }}</p>
+    <article class="document">{{ doc.text }}</article>
+  </main>
+</body>
+</html>

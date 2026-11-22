@@ -178,5 +178,26 @@ def crawl_cmd(
     )
 
 
+
+
+@app.command("serve")
+def serve_cmd(
+    port: int | None = typer.Option(None, "--port", min=1, max=65535),
+    workers: int = typer.Option(1, "--workers", min=1),
+) -> None:
+    """Serve the FastAPI application with Uvicorn."""
+    import uvicorn
+    from findex.web.settings import Settings
+
+    settings = Settings()
+    uvicorn.run(
+        "findex.web.app:app",
+        host="0.0.0.0",
+        port=port or settings.port,
+        workers=workers,
+        log_level=settings.log_level.lower(),
+    )
+
+
 if __name__ == "__main__":
     app()

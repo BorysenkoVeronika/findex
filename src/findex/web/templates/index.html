@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Findex | Search</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+  <main class="container">
+    <header><h1>Findex</h1><p>Search your indexed documents.</p></header>
+    <form action="/" method="get" role="search">
+      <label for="q">Search query</label>
+      <div class="search-row"><input id="q" name="q" value="{{ query }}" placeholder="Search terms" maxlength="200" required autofocus><button type="submit">Search</button></div>
+    </form>
+    {% if query %}
+      <h2>{{ total }} results for “{{ query }}”</h2>
+      {% for item in results %}
+        <article class="result">
+          <h3><a href="/doc/{{ item.doc_id }}">{{ item.title }}</a></h3>
+          <small>Score {{ '%.4f'|format(item.score) }}</small>
+          <p>{{ item.snippet_html | safe }}</p>
+        </article>
+      {% else %}
+        <p>No documents matched your query.</p>
+      {% endfor %}
+      <nav aria-label="Pagination" class="pagination">
+        {% if has_previous %}<a href="/?q={{ query | urlencode }}&page={{ page - 1 }}">Previous</a>{% endif %}
+        <span>Page {{ page }}</span>
+        {% if has_next %}<a href="/?q={{ query | urlencode }}&page={{ page + 1 }}">Next</a>{% endif %}
+      </nav>
+    {% endif %}
+    <footer><a href="/docs">API documentation</a></footer>
+  </main>
+</body>
+</html>
