@@ -15,7 +15,6 @@ from typing import Annotated, Literal
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -60,9 +59,7 @@ app.mount("/static", StaticFiles(directory=str(_WEB_ROOT / "static")), name="sta
 
 
 @app.middleware("http")
-async def request_ids(
-    request: Request, call_next: Callable[[Request], Awaitable[Response]]
-) -> Response:
+async def request_ids(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     identifier = request.headers.get("X-Request-ID") or uuid4().hex
     request.state.request_id = identifier
     try:
@@ -71,7 +68,9 @@ async def request_ids(
         logger.exception("Request failed request_id=%s path=%s", identifier, request.url.path)
         response = JSONResponse(status_code=500, content={"detail": "Internal server error", "request_id": identifier})
     response.headers["X-Request-ID"] = identifier
-    logger.info("request_id=%s method=%s path=%s status=%s", identifier, request.method, request.url.path, response.status_code)
+    logger.info(
+        "request_id=%s method=%s path=%s status=%s", identifier, request.method, request.url.path, response.status_code
+    )
     return response
 
 
@@ -94,9 +93,13 @@ def _compute(index: Index, q: str, k: int, scorer: ScorerName, page: int) -> Sea
         ordered = ranked_search(index, q, scorer=BM25() if scorer == "bm25" else TfIdf(), k=page * k)
     except (ValueError, SyntaxError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=f"Invalid query: {exc}") from exc
-    results = [SearchResult(doc_id=r.doc_id, title=r.title, score=r.score, snippet=r.snippet)
-               for r in ordered[(page - 1) * k: page * k]]
-    return SearchResponse(query=q, total=len(matches), took_ms=round((time.perf_counter() - start) * 1000, 3), results=results)
+    results = [
+        SearchResult(doc_id=r.doc_id, title=r.title, score=r.score, snippet=r.snippet)
+        for r in ordered[(page - 1) * k : page * k]
+    ]
+    return SearchResponse(
+        query=q, total=len(matches), took_ms=round((time.perf_counter() - start) * 1000, 3), results=results
+    )
 
 
 @app.get("/search", response_model=SearchResponse)
@@ -133,8 +136,12 @@ def document_api(doc_id: int, index: IndexDep) -> DocumentResponse:
 
 @app.get("/stats", response_model=StatsResponse)
 def stats_route(index: IndexDep, request: Request) -> StatsResponse:
-    return StatsResponse(documents=index.num_docs, vocabulary=len(index), tokens=sum(index.doc_lengths.values()),
-                         uptime_s=round(time.monotonic() - getattr(request.app.state, "started", time.monotonic()), 3))
+    return StatsResponse(
+        documents=index.num_docs,
+        vocabulary=len(index),
+        tokens=sum(index.doc_lengths.values()),
+        uptime_s=round(time.monotonic() - getattr(request.app.state, "started", time.monotonic()), 3),
+    )
 
 
 @app.get("/health")
@@ -158,14 +165,25 @@ def homepage(
     page: Annotated[int, Query(ge=1)] = 1,
 ) -> HTMLResponse:
     response = _compute(index, q, 10, "bm25", page) if q.strip() else None
-    results = ([{"doc_id": r.doc_id, "title": r.title, "score": r.score, "snippet_html": _highlight(r.snippet)}
-                for r in response.results] if response else [])
+    results = (
+        [
+            {"doc_id": r.doc_id, "title": r.title, "score": r.score, "snippet_html": _highlight(r.snippet)}
+            for r in response.results
+        ]
+        if response
+        else []
+    )
     return _templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"query": q, "results": results, "page": page,
-                 "total": response.total if response else 0, "has_next": bool(response and page * 10 < response.total),
-                 "has_previous": page > 1},
+        context={
+            "query": q,
+            "results": results,
+            "page": page,
+            "total": response.total if response else 0,
+            "has_next": bool(response and page * 10 < response.total),
+            "has_previous": page > 1,
+        },
     )
 
 

@@ -13,8 +13,7 @@ def small_index():
     return Index(
         postings={"python": [Posting(0, 1), Posting(1, 1)], "java": [Posting(1, 1)]},
         doc_lengths={0: 2, 1: 3},
-        doc_meta={0: DocMeta("a.txt", "Alpha", "Python is great"),
-                  1: DocMeta("b.txt", "Beta", "Python and Java")},
+        doc_meta={0: DocMeta("a.txt", "Alpha", "Python is great"), 1: DocMeta("b.txt", "Beta", "Python and Java")},
     )
 
 
@@ -34,10 +33,16 @@ def test_search_pagination(client):
     assert len(response.json()["results"]) == 1
 
 
-@pytest.mark.parametrize("params", [
-    {"q": ""}, {"q": "python", "k": 0}, {"q": "python", "k": "abc"},
-    {"q": "python", "page": 0}, {"q": "python", "scorer": "invalid"},
-])
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"q": ""},
+        {"q": "python", "k": 0},
+        {"q": "python", "k": "abc"},
+        {"q": "python", "page": 0},
+        {"q": "python", "scorer": "invalid"},
+    ],
+)
 def test_query_validation(client, params):
     response = client.get("/search", params=params)
     assert response.status_code == 422
@@ -63,6 +68,7 @@ def test_health_503_without_index():
     async def no_index_lifespan(application):
         application.state.index = None
         yield
+
     original = app.router.lifespan_context
     app.router.lifespan_context = no_index_lifespan
     try:

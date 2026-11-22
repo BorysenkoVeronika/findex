@@ -178,8 +178,6 @@ def crawl_cmd(
     )
 
 
-
-
 @app.command("serve")
 def serve_cmd(
     port: int | None = typer.Option(None, "--port", min=1, max=65535),
