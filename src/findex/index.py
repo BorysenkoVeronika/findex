@@ -29,15 +29,9 @@ class DocMeta:
 
 @dataclass
 class Index(Mapping[str, list[Posting]]):
-    postings: dict[str, list[Posting]] = field(
-        default_factory=lambda: dict[str, list[Posting]]()
-    )
-    doc_lengths: dict[int, int] = field(
-        default_factory=lambda: dict[int, int]()
-    )
-    doc_meta: dict[int, DocMeta] = field(
-        default_factory=lambda: dict[int, DocMeta]()
-    )
+    postings: dict[str, list[Posting]] = field(default_factory=lambda: dict[str, list[Posting]]())
+    doc_lengths: dict[int, int] = field(default_factory=lambda: dict[int, int]())
+    doc_meta: dict[int, DocMeta] = field(default_factory=lambda: dict[int, DocMeta]())
 
     def __len__(self) -> int:
         return len(self.postings)
