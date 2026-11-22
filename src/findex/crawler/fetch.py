@@ -9,10 +9,9 @@ from email.utils import parsedate_to_datetime
 import random
 import time
 import logging
+import httpx
 
 logger = logging.getLogger("findex.crawler")
-
-import httpx
 
 
 @dataclass(frozen=True, slots=True)
