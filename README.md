@@ -1,6 +1,6 @@
-# Findex
+# Findex — Labs 01–08
 
-Python search engine built progressively through Lab 06.
+Python search engine with corpus indexing, boolean and ranked retrieval, asynchronous crawling, a FastAPI UI, and NumPy-based ranking.
 
 ## Usage
 
@@ -201,6 +201,52 @@ docker build -t findex .
 docker run --rm -p 8000:8000 -e INDEX_PATH=/app/index.bin findex
 ```
 
-The application is configured for deployment on a Docker-compatible hosting platform using environment variables and `/health`. **No deployed public URL is available yet**, and Docker has not been built or run for this delivery.
+The application is configured for deployment on a Docker-compatible hosting platform using environment variables and `/health`. 
 
 Both the normal synchronous endpoint and the async endpoint with `asyncio.to_thread` offload CPU-bound ranking to threads instead of doing it directly in the event loop. On conventional CPython, the GIL can limit CPU-bound thread scaling; multiple Uvicorn worker processes use separate interpreters and can use more cores, at the cost of more memory and startup overhead. Network latency and scheduling also affect tail latency.
+
+
+## Lab 08 — Profiling, NumPy and Compact Postings
+
+The vectorized scorer lives in `src/findex/numpy_search.py`. `search_numpy` performs BM25 and TF-IDF calculations over `numpy.int32` posting arrays, an `int32` document-length array, and a `float64` score array. It uses vectorized arithmetic, `np.add.at` and `np.partition` to select top-k candidates, with deterministic ordering for ties. The original scorer remains available for comparison. Tests cover identical ranking order and approximately equal scores for BM25 and TF-IDF.
+
+### Profiling and speed comparison
+
+The local `cProfile` run analyzed 100 three-term searches and a 10× copy of the three-document corpus. The cumulative-time report is in `docs/lab08-cprofile.txt` and the machine-readable profile is in `docs/lab08-cprofile.prof`. The top functions included `search`, `build_from_documents` and `make_snippet`; `tokenize` was also a significant component of indexing. Search time includes snippet rendering and query evaluation, not just floating-point scoring. One hypothesis for optimization is that vectorized scoring can reduce Python per-posting iteration on larger match sets; on this tiny corpus, array setup and dispatch overhead dominate.
+
+The following timings were measured locally as the median of 15 calls per query, after a warmup, on the three-document sample corpus. Units are milliseconds; a speedup below 1 means NumPy was slower.
+
+| Query | Documents matched | Classic (ms) | NumPy (ms) | Speedup |
+|---|---:|---:|---:|---:|
+| Common term (`programming`) | 2 | 0.014545 | 0.034076 | 0.43× |
+| Rare term (`python`) | 1 | 0.007353 | 0.025239 | 0.29× |
+| Three-term (`python OR java OR javascript`) | 3 | 0.033215 | 0.080902 | 0.41× |
+
+These figures should not be extrapolated to larger collections. Run `uv run python benchmarks/lab08.py --corpus data --out docs` to repeat the measurements and regenerate the CSV. `pytest-benchmark` compares indexing and both search implementations on the fixture corpus.
+
+### Deep optimization alternative to embeddings (M3)
+
+Instead of a semantic embedding model, the project uses the alternative from the lab: gap-encoded `int32` document IDs and term frequencies written as a flat binary stream, plus a JSON term offset table. `load_compressed` uses NumPy `memmap`, decodes gaps with `cumsum` and provides posting arrays to `search_numpy`. This implementation preserves classic ranking results. The 10× corpus experiment contains 30 documents and writes **11,840 bytes** of packed postings, excluding the term metadata JSON. It is a synthetic expansion of the small provided corpus, not an independently collected dataset.
+
+Example:
+
+```bash
+uv run python -m findex index data/ --out index.bin
+uv run python -m findex search index.bin "python OR java" --engine numpy
+uv run python benchmarks/lab08.py --corpus data --out docs
+```
+
+### Architecture
+
+```mermaid
+flowchart LR
+  A[Corpus / JSONL] --> B[Crawler and loader - Labs 01 and 06]
+  B --> C[Tokenizer - Lab 01]
+  C --> D[Inverted index - Labs 02 and 05]
+  D --> E[Keyword query parser - Lab 03]
+  E --> F[Classic or NumPy scorer - Labs 03 and 08]
+  F --> G[FastAPI - Lab 07]
+  G --> H[Web interface - Lab 07]
+```
+
+The NumPy path does not provide embeddings or semantic search: it optimizes keyword-based retrieval. Small datasets can be slower because converting and accessing arrays adds overhead. The compact postings representation currently stores only document IDs and term frequencies; positional phrase search still depends on the original index. Profiles, benchmarks, and corpus sizes above are specific to the documented experiment.

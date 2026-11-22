@@ -1,0 +1,4 @@
+query,matches,classic_ms,numpy_ms,speedup
+common term,2,0.014545,0.034076,0.4268
+rare term,1,0.007353,0.025239,0.2913
+three-term query,3,0.033215,0.080902,0.4106

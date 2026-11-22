@@ -1,0 +1,33 @@
+         25236 function calls (25036 primitive calls) in 0.015 seconds
+
+   Ordered by: cumulative time
+   List reduced from 46 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      100    0.001    0.000    0.010    0.000 /mnt/data/lab08_build/findex/src/findex/search.py:135(search)
+        1    0.004    0.004    0.007    0.007 /mnt/data/lab08_build/findex/src/findex/index.py:72(build_from_documents)
+      300    0.001    0.000    0.006    0.000 /mnt/data/lab08_build/findex/src/findex/search.py:115(make_snippet)
+      300    0.000    0.000    0.002    0.000 {method 'join' of 'str' objects}
+     1980    0.001    0.000    0.002    0.000 /mnt/data/lab08_build/findex/src/findex/tokenize.py:11(tokenize)
+      300    0.001    0.000    0.001    0.000 {method 'sub' of 're.Pattern' objects}
+     1200    0.000    0.000    0.001    0.000 /mnt/data/lab08_build/findex/src/findex/search.py:124(<genexpr>)
+      300    0.001    0.000    0.001    0.000 /mnt/data/lab08_build/findex/src/findex/search.py:93(score)
+      900    0.000    0.000    0.001    0.000 /usr/lib/python3.13/re/__init__.py:305(escape)
+     3430    0.001    0.000    0.001    0.000 {method 'append' of 'list' objects}
+      300    0.000    0.000    0.001    0.000 /usr/lib/python3.13/re/__init__.py:287(compile)
+     1950    0.001    0.000    0.001    0.000 {method 'group' of 're.Match' objects}
+      900    0.001    0.000    0.001    0.000 {method 'translate' of 'str' objects}
+     3110    0.001    0.000    0.001    0.000 {built-in method builtins.len}
+      300    0.000    0.000    0.001    0.000 /usr/lib/python3.13/re/__init__.py:330(_compile)
+      600    0.000    0.000    0.000    0.000 /mnt/data/lab08_build/findex/src/findex/index.py:62(df)
+      330    0.000    0.000    0.000    0.000 {method 'casefold' of 'str' objects}
+  200/100    0.000    0.000    0.000    0.000 /mnt/data/lab08_build/findex/src/findex/query.py:77(evaluate)
+      400    0.000    0.000    0.000    0.000 {built-in method builtins.sorted}
+      300    0.000    0.000    0.000    0.000 /mnt/data/lab08_build/findex/src/findex/index.py:51(num_docs)
+      100    0.000    0.000    0.000    0.000 /usr/lib/python3.13/heapq.py:523(nlargest)
+     1480    0.000    0.000    0.000    0.000 {method 'setdefault' of 'dict' objects}
+     1200    0.000    0.000    0.000    0.000 {method 'get' of 'dict' objects}
+      300    0.000    0.000    0.000    0.000 /usr/lib/python3.13/enum.py:199(__get__)
+      300    0.000    0.000    0.000    0.000 /mnt/data/lab08_build/findex/src/findex/query.py:32(evaluate)
+
+

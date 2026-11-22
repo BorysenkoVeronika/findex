@@ -61,9 +61,16 @@ def search_cmd(
     k: int = typer.Option(10, "--k", min=1),
     scorer: Literal["bm25", "tfidf"] = typer.Option("bm25", "--scorer"),
     json_output: bool = typer.Option(False, "--json"),
+    engine: Literal["classic", "numpy"] = typer.Option("classic", "--engine"),
 ) -> None:
     ix = load(index)
-    results = run_search(ix, query, scorer=BM25() if scorer == "bm25" else TfIdf(), k=k)
+    score_model = BM25() if scorer == "bm25" else TfIdf()
+    if engine == "numpy":
+        from findex.numpy_search import search_numpy
+
+        results = search_numpy(ix, query, scorer=score_model, k=k)
+    else:
+        results = run_search(ix, query, scorer=score_model, k=k)
     if json_output:
         for result in results:
             typer.echo(

@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         logger.info("Index released")
 
 
-app = FastAPI(title="Findex", version="0.7.0", lifespan=lifespan)
+app = FastAPI(title="Findex", version="1.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(_WEB_ROOT / "static")), name="static")
 
 
