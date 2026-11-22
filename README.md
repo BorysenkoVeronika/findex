@@ -1,15 +1,15 @@
-# Findex — Labs 01–02
+# Findex — Labs 01–03
 
-Python search engine built progressively through Lab 02.
+Python search engine built progressively through Lab 03.
 
 ## Usage
 
 ```bash
 python -m findex.index data/ --out index.bin --positions
-python -m findex.search index.bin "python OR java" --engine merge
+python -m findex.search index.bin "python OR java"
 ```
 
-From the project root, use `PYTHONPATH=src` when the package has not been installed.
+Run from an installed environment or set `PYTHONPATH=src`.
 
 ## Lab 01 — Iterators and the Corpus
 
@@ -24,7 +24,7 @@ These original measurements on the tiny corpus do not demonstrate a meaningful m
 
 ## Lab 02 — Inverted Index and Memory
 
-The index contains sorted `Posting(doc_id, tf, positions)` lists, per-document lengths and metadata. Boolean search supports implicit AND, OR, NOT, and both sorted-list merge and set engines. Pickle (`.bin`) and JSON (`.json`) persistence are supported. **Only unpickle files from trusted sources:** pickle deserialization can execute code.
+`Index` contains sorted `Posting(doc_id, tf, positions)` lists, per-document lengths and metadata. Boolean search supports implicit AND, OR, NOT, and both sorted-list merge and set engines. Pickle (`.bin`) and JSON (`.json`) persistence are supported. **Only unpickle files from trusted sources:** pickle deserialization can execute code.
 
 ### Posting representation experiment
 
@@ -56,4 +56,28 @@ Measured on the provided three-document corpus during the complete-project audit
 | bin | 6039 | 0.5823 | 0.2593 |
 
 Positions increased binary index size from 5497 to 6039 bytes on this sample.
+
+## Lab 03 — Object Model, Query Language and Ranking
+
+`Index` implements the mapping protocol and exposes `num_docs`, `avg_doc_length`, `doc_length`, and `df`. Query nodes (`Term`, `Phrase`, `And`, `Or`, `Not`) form a dataclass AST with `&`, `|`, `~`, and `.evaluate(index)`. The parser supports precedence, quoted phrases, NOT, and parentheses. `TfIdf` and `BM25(k1=1.5, b=0.75)` implement a swappable scorer interface. Top-k results include document titles and highlighted context snippets. Query parsing uses an LRU cache of 256 expressions. Ranking saturation and length normalization are tested.
+
+
+### Hand-labeled precision@5 (three-document corpus)
+
+The labels were written against the actual sample documents. Each query has one relevant document, so the maximum possible precision@5 is 0.20; this is not a realistic search-quality benchmark.
+
+| Query | Relevant title | TF-IDF P@5 | BM25 P@5 |
+|---|---|---:|---:|
+| python | document | 0.20 | 0.20 |
+| garbage collection | document | 0.20 | 0.20 |
+| dynamic typing | document | 0.20 | 0.20 |
+| java | document2 | 0.20 | 0.20 |
+| gosling | document2 | 0.20 | 0.20 |
+| oracle | document2 | 0.20 | 0.20 |
+| javascript | document3 | 0.20 | 0.20 |
+| typescript | document3 | 0.20 | 0.20 |
+| github | document3 | 0.20 | 0.20 |
+| web | document3 | 0.20 | 0.20 |
+
+Ranking sanity checks (also covered by automated tests): BM25 term-frequency gains diminish under repetition; length normalization favors a shorter document at equal term frequency; uncommon terms have greater inverse-document-frequency influence. For this very small corpus, ties and query-specific lengths can affect observed order.
 
